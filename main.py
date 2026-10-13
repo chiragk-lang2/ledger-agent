@@ -154,6 +154,8 @@ def answer_question(q, records, rates):
         cur = "EUR"
     divisor = rates[cur]
 
+    money_q = bool(re.search(r"\b(dollars?|usd|rupees?|inr|euros?|eur)\b", ql))
+
     # ---- ranking questions: top / highest / lowest ... ----
     rank_words = r"\b(top|highest|best|most|largest|biggest|lowest|least|worst|fewest|smallest)\b"
     if re.search(rank_words, ql):
@@ -184,21 +186,24 @@ def answer_question(q, records, rates):
                 return [k for k, _ in ordered[:int(n.group(1))]]
             return ordered[0][0]
 
+    # ---- averages (checked BEFORE counting, so "how many dollars on average" works) ----
+    if re.search(r"\b(average|mean|avg)\b", ql):
+        if not rows:
+            return 0
+        if re.search(r"units|quantity|pieces", ql) and not money_q:
+            return clean(sum(r["qty"] for r in rows) / len(rows))
+        return clean(sum(r["usd"] for r in rows) / len(rows) / divisor)
+
     # ---- counting questions ----
-    if "how many" in ql or "number of" in ql or re.search(r"\bcount\b", ql):
+    if ("how many" in ql and not money_q) or "number of" in ql or re.search(r"\bcount\b", ql):
         if "customer" in ql:
             return len({r["customer"] for r in rows})
         if re.search(r"units|quantity|pieces", ql):
             return clean(sum(r["qty"] for r in rows))
         return len(rows)
 
-    if re.search(r"units|quantity|pieces", ql):
+    if re.search(r"units|quantity|pieces", ql) and not money_q:
         return clean(sum(r["qty"] for r in rows))
-
-    if re.search(r"\b(average|mean|avg)\b", ql):
-        if not rows:
-            return 0
-        return clean(sum(r["usd"] for r in rows) / len(rows) / divisor)
 
     # ---- default: total money ----
     return clean(sum(r["usd"] for r in rows) / divisor)
