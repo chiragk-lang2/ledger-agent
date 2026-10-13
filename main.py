@@ -135,6 +135,9 @@ def clean(x):
 
 def answer_question(q, records, rates):
     ql = q.lower()
+    # "at least one" / "at most" are not ranking words
+    ql = re.sub(r"\bat\s+(least|most)\b", " ", ql)
+
     f = parse_filters(q)
     rows = [r for r in records if matches(r, f)]
 
@@ -155,6 +158,12 @@ def answer_question(q, records, rates):
     divisor = rates[cur]
 
     money_q = bool(re.search(r"\b(dollars?|usd|rupees?|inr|euros?|eur)\b", ql))
+
+    # ---- distinct counts: "how many different/distinct/unique customers ..." ----
+    dm = re.search(r"\b(different|distinct|unique)\s+(customers?|products?|regions?)\b", ql)
+    if dm and re.search(r"how many|number of|count", ql):
+        dim = dm.group(2).rstrip("s")
+        return len({r[dim] for r in rows})
 
     # ---- ranking questions: top / highest / lowest ... ----
     rank_words = r"\b(top|highest|best|most|largest|biggest|lowest|least|worst|fewest|smallest)\b"
